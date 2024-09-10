@@ -1,0 +1,6 @@
+﻿services:
+  majetrack.api:
+    image: majetrack.api
+    build:
+      context: .
+      dockerfile: MajeTrack.Api/Dockerfile
