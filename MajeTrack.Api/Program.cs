@@ -1,7 +1,8 @@
 using System.Reflection;
-using System.Text;
 using MajeTrack.Api.Common;
-using Microsoft.IdentityModel.Tokens;
+using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Identity;
 using Serilog;
 
 Log.Logger = new LoggerConfiguration()
@@ -14,6 +15,8 @@ try
     Log.Information("Starting MajeTrack API application");
 
     var builder = WebApplication.CreateBuilder(args);
+    var configuration = builder.Configuration;
+    
     builder.Services.AddSerilog();
     
 // TODO Add DbContext
@@ -25,23 +28,26 @@ try
 
     builder.Services.AddEndpoints(Assembly.GetExecutingAssembly());
 
-    builder.Services.AddAuthentication()
-        .AddJwtBearer(o =>
-        {
-            o.TokenValidationParameters = new TokenValidationParameters
-            {
-                // TODO: Dodelat JWT konfigurace 
-                //IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(configuration["Jwt:Secret"]!)),
-                //ValidIssuer = configuration["Jwt:Issuer"],
-                //ValidAudience = configuration["Jwt:Audience"]
-            };
-        });
-
-    builder.Services.AddAuthorization();
-
+    builder.Services.AddAuthentication(o =>
+    {
+        o.DefaultAuthenticateScheme = JwtBearerDefaults.AuthenticationScheme;
+        o.DefaultChallengeScheme = IdentityConstants.BearerScheme;
+        o.DefaultScheme = JwtBearerDefaults.AuthenticationScheme;
+    }).AddJwtBearer(o =>
+    {
+        o.Authority = configuration["JwtSettings:Issuer"];
+        o.Audience = configuration["JwtSettings:Audience"];
+    });
+    
+    builder.Services.AddAuthorization(o => o.FallbackPolicy = new AuthorizationPolicyBuilder()
+        .AddAuthenticationSchemes(JwtBearerDefaults.AuthenticationScheme)
+        .RequireAuthenticatedUser()
+        .Build());
+    
+    builder.Services.AddCors();
+    
     var app = builder.Build();
 
-// Configure the HTTP request pipeline.
     if (app.Environment.IsDevelopment())
     {
         app.UseSwagger();
@@ -50,7 +56,7 @@ try
 
     app.UseHttpsRedirection();
 
-    app.UseCors();
+    app.UseCors(o => o.AllowAnyOrigin().AllowAnyMethod().AllowAnyHeader());
     app.UseAuthentication();
     app.UseAuthorization();
 
